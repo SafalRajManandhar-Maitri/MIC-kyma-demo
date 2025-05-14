@@ -1,0 +1,9 @@
+1. Download Kubeconfig.yaml
+2. Setup KUBECONFIG environment
+3. Create env secrets
+    kubectl create secret generic app-env --from-env-file=.env
+4. Start PSQL instance
+    ./get-egress-ips.ps1
+    powershell -ExecutionPolicy Bypass -File .\get-egress-ips.ps1
+5. Deploy minio
+6. Deploy app

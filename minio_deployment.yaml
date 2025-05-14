@@ -1,0 +1,114 @@
+# ========================
+# Persistent Volume for MinIO
+# ========================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: minio-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+  - ReadWriteOnce
+  hostPath:
+    path: /data/minio
+---
+# ========================
+# Persistent Volume Claim for MinIO
+# ========================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# ========================
+# MinIO Deployment
+# ========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        image: quay.io/minio/minio:latest
+        args:
+        - server
+        - /data
+        - --console-address
+        - ":9090"
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-env
+              key: MINIO_ROOT_USER
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-env
+              key: MINIO_ROOT_PASSWORD
+        ports:
+        - containerPort: 9000
+        - containerPort: 9090
+        volumeMounts:
+        - name: minio-storage
+          mountPath: /data
+      volumes:
+      - name: minio-storage
+        persistentVolumeClaim:
+          claimName: minio-pvc
+---
+# ========================
+# MinIO Service
+# ========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+spec:
+  selector:
+    app: minio
+  ports:
+  - name: api
+    port: 9000
+    targetPort: 9000
+  - name: console
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
+---
+# ========================
+# APIRule for MinIO Console Public Access
+# ========================
+apiVersion: gateway.kyma-project.io/v1beta1
+kind: APIRule
+metadata:
+  name: minio-client-api
+spec:
+  gateway: kyma-system/kyma-gateway
+  host: minio-client.a789781.kyma.ondemand.com
+  service:
+    name: minio-service
+    port: 9090
+  rules:
+  - path: /.*
+    methods: [ "GET", "POST" ]
+    accessStrategies:
+    - handler: allow
+      config: {}
